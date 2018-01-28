@@ -30,7 +30,7 @@ for text in tweet_content :
     try :
         s = wordpunct_tokenize(text)
         list_token.append(s)
-    except:
+    except : 
         continue
 
     
