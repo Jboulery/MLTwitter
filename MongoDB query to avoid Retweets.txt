@@ -1,0 +1,10 @@
+use TheVoice;
+db.TheVoiceTweets.find({
+  text: {$not: /^RT/},
+  created_at : {$gte: "Sat Jan 27 20:00:00 +0000 2018"}},
+  {
+    "_id" : 0.0,
+    "text" : 1.0,
+    "extended_tweet.full_text" : 1.0,
+    "created_at" : 1.0
+});
