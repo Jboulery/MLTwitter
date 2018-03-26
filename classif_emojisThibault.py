@@ -7,12 +7,12 @@ import emoji_list as moji
 data = pd.read_excel('TheVoiceTweets.xlsx')
 
 data['text'] = data['extended_tweet.full_text'].fillna(data['text'])
-data = data.drop(columns=['extended_tweet.full_text'])
+data = data.drop(columns=['extended_tweet.full_text']) # fusion de la colonne text avec la colonne full_text
 
-train, test = train_test_split(data,test_size = 0.1)
+train, test = train_test_split(data,test_size = 0.1) # séparation des données en ensemble de train / ensemble de test (90%, 10%)
 
-train = train.dropna() # getting rid of the not-annotated rows
-train = train[train.sentiment != 'zero']
+train = train.dropna() # on se débarrasse des lignes qui n'ont pas d'annotation
+train = train[train.sentiment != 'zero'] # l'apprentissage ne se fait que sur des tweets positifs ou négatifs
 
 train_pos = train[ train['sentiment'] == 'positive']
 train_pos = train_pos['text']
@@ -22,37 +22,24 @@ train_neg = train_neg['text']
 tweets = []
 
 emojis = set(moji.all_emoji)
-emojis.discard('#')
-
-for char in printable:
+for char in printable: # on retire les caractères de la liste d'emojis
     emojis.discard(char)
                
-def clean_tweet(tweet):
+def clean_tweet(tweet): # Entrée : un tweet de type string. Sortie : une liste de couples : (liste des emojis du tweet, sentiment du tweet) 
     cleaned = []
     emojis_used = []
     
-    for word in tweet.split(): # for each word in the tweet
-        if ('http' in word) or ('#' in word) or ('@' in word):
-           continue
-       
-        while "'" in word:
-            word = word.split("'")[1] # "j'aime" ==> "aime"
-        
-        while "’" in word:
-            word = word.split("’")[1] # "j’aime" ==> "aime"
-            
-        word = word.strip('!.,"?*0123456789') # "16ans???" ==> "ans"
-        
-        word = word.replace('\\n','') # "\\ngénial" ==> "génial"
-        
-        while (len(word) > 0) and (word[0] in emojis): # ":o:):)super:D" ==> ":o", ":)", "super:D"
+    for word in tweet.split(): # pour chaque mot du tweet
+        word = word.strip(printable) #retirer tous les caractères du mot (on ne garde que les emojis)
+
+        while (len(word) > 0) and (word[0] in emojis): # si un emoji se trouve au début du mot
             if word[0] not in emojis_used:
                 emojis_used.append(word[0])
                 cleaned.append(word[0])
             
             word = word[1:]
         
-        while (len(word) > 0) and (word[-1] in emojis): # "super:D" ==> ":D", "super"
+        while (len(word) > 0) and (word[-1] in emojis): # si un emoji se trouve à la fin du mot
             if word[-1] not in emojis_used:
                 emojis_used.append(word[-1])
                 cleaned.append(word[-1])
@@ -61,15 +48,11 @@ def clean_tweet(tweet):
         
     return cleaned
 
-for index, row in train.iterrows(): # for each tweet
+#Constitution de la liste de tweets nettoyés, qui servira pour l'apprentissage
+for index, row in train.iterrows(): # pour chaque tweet
     cleaned = clean_tweet(row.text)
     if cleaned:
         tweets.append((cleaned,row.sentiment))
-
-test_pos = test[ test['sentiment'] == 'positive']
-test_pos = test_pos['text']
-test_neg = test[ test['sentiment'] == 'negative']
-test_neg = test_neg['text']
 
 def get_words_in_tweets(tweets):
     all = []
@@ -93,42 +76,42 @@ def extract_features(document):
 training_set = nltk.classify.apply_features(extract_features,tweets)
 classifier = nltk.NaiveBayesClassifier.train(training_set)
 
+def classify_tweet(tweet): # Entrée : un tweet de type string. Sortie : "positive" ou "negative"
+    for word in tweet.split():
+        if (word[0] in emojis) or (word[-1] in emojis):
+            return classifier.classify(extract_features(tweet)) # Retourne la classification du tweet ('positive' ou 'negative') s'il y a au moins 1 emoji dans le tweet
+    return False # Retourne False s'il n'y a aucun emoji dans le tweet
+
+
+# ------------------------------- Test du classifieur ---------------------------------
+test_pos = test[ test['sentiment'] == 'positive']
+test_pos = test_pos['text']
+test_neg = test[ test['sentiment'] == 'negative']
+test_neg = test_neg['text']
+
 neg_cnt = 0
 pos_cnt = 0
 total_neg = 0
 total_pos = 0
-print("\n----- Negative tweets with emojis -----\n")
-for obj in test_neg:
-    for word in obj.split():
-        if (word[0] in emojis) or (word[-1] in emojis):
-            print(obj)
-            total_neg += 1
-            res =  classifier.classify(extract_features(obj))
-            if(res == 'negative'): 
-                neg_cnt = neg_cnt + 1
-            break
-        else:
-            continue
 
-for obj in test_pos:
-    for word in obj.split():
-        if (word[0] in emojis) or (word[-1] in emojis):
-            total_pos += 1
-            res =  classifier.classify(extract_features(obj))
-            if(res == 'positive'): 
-                pos_cnt = pos_cnt + 1
-            break
-        else:
-            continue
+# Test sur tweets annotés négativement
+for tweet in test_neg:
+    classification = classify_tweet(tweet)
+    if classification: # si le tweet a au moins un emoji
+        total_neg += 1
+        if classification == 'negative': 
+            neg_cnt += 1
+
+# Test sur les tweets annotés positivement
+for tweet in test_pos:
+    classification = classify_tweet(tweet)
+    if classification:
+        total_pos += 1
+        if classification == 'positive': 
+            pos_cnt += 1
 
 print()
 print('[negative]: %s/%s '  % (neg_cnt, total_neg))
 print('[positive]: %s/%s '  % (pos_cnt, total_pos))
 print()
-
-def classify_tweet(tweet):
-    for word in tweet.split():
-        if (word[0] in emojis) or (word[-1] in emojis):
-            print(tweet, "[", classifier.classify(extract_features(clean_tweet(tweet))), "]")
-            break
-    return 0
+# ---------------------------- Fin de test du classifieur ------------------------------
