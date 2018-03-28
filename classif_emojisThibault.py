@@ -9,15 +9,10 @@ data = pd.read_excel('TheVoiceTweets.xlsx')
 data['text'] = data['extended_tweet.full_text'].fillna(data['text'])
 data = data.drop(columns=['extended_tweet.full_text']) # fusion de la colonne text avec la colonne full_text
 
-train, test = train_test_split(data,test_size = 0.1) # séparation des données en ensemble de train / ensemble de test (90%, 10%)
+train, test = train_test_split(data,test_size = 0) # séparation des données en ensemble de train / ensemble de test (90%, 10%)
 
 train = train.dropna() # on se débarrasse des lignes qui n'ont pas d'annotation
 train = train[train.sentiment != 'zero'] # l'apprentissage ne se fait que sur des tweets positifs ou négatifs
-
-train_pos = train[ train['sentiment'] == 'positive']
-train_pos = train_pos['text']
-train_neg = train[ train['sentiment'] == 'negative']
-train_neg = train_neg['text']
 
 tweets = []
 
@@ -27,25 +22,13 @@ for char in printable: # on retire les caractères de la liste d'emojis
                
 def clean_tweet(tweet): # Entrée : un tweet de type string. Sortie : une liste de couples : (liste des emojis du tweet, sentiment du tweet) 
     cleaned = []
-    emojis_used = []
+    tweet.strip(printable) # retirer tous les caractères du tweet
     
     for word in tweet.split(): # pour chaque mot du tweet
-        word = word.strip(printable) #retirer tous les caractères du mot (on ne garde que les emojis)
-
-        while (len(word) > 0) and (word[0] in emojis): # si un emoji se trouve au début du mot
-            if word[0] not in emojis_used:
-                emojis_used.append(word[0])
-                cleaned.append(word[0])
-            
-            word = word[1:]
-        
-        while (len(word) > 0) and (word[-1] in emojis): # si un emoji se trouve à la fin du mot
-            if word[-1] not in emojis_used:
-                emojis_used.append(word[-1])
-                cleaned.append(word[-1])
-            
-            word = word[:-1]
-        
+        for char in word:
+            if char not in cleaned and char in emojis: # si c'est la première fois que l'emoji apparait dans le tweet
+                cleaned.append(char)
+                
     return cleaned
 
 #Constitution de la liste de tweets nettoyés, qui servira pour l'apprentissage
@@ -78,40 +61,44 @@ classifier = nltk.NaiveBayesClassifier.train(training_set)
 
 def classify_tweet(tweet): # Entrée : un tweet de type string. Sortie : "positive" ou "negative"
     for word in tweet.split():
-        if (word[0] in emojis) or (word[-1] in emojis):
-            return classifier.classify(extract_features(tweet)) # Retourne la classification du tweet ('positive' ou 'negative') s'il y a au moins 1 emoji dans le tweet
+        for char in word:
+            if char in emojis: # Dès que l'on identifie un emoji dans le tweet
+                return classifier.classify(extract_features(tweet)) # Retourne la classification du tweet ('positive' ou 'negative') s'il y a au moins 1 emoji dans le tweet
     return False # Retourne False s'il n'y a aucun emoji dans le tweet
 
 
-# ------------------------------- Test du classifieur ---------------------------------
-test_pos = test[ test['sentiment'] == 'positive']
-test_pos = test_pos['text']
-test_neg = test[ test['sentiment'] == 'negative']
-test_neg = test_neg['text']
-
-neg_cnt = 0
-pos_cnt = 0
-total_neg = 0
-total_pos = 0
-
-# Test sur tweets annotés négativement
-for tweet in test_neg:
-    classification = classify_tweet(tweet)
-    if classification: # si le tweet a au moins un emoji
-        total_neg += 1
-        if classification == 'negative': 
-            neg_cnt += 1
-
-# Test sur les tweets annotés positivement
-for tweet in test_pos:
-    classification = classify_tweet(tweet)
-    if classification:
-        total_pos += 1
-        if classification == 'positive': 
-            pos_cnt += 1
-
-print()
-print('[negative]: %s/%s '  % (neg_cnt, total_neg))
-print('[positive]: %s/%s '  % (pos_cnt, total_pos))
-print()
-# ---------------------------- Fin de test du classifieur ------------------------------
+# =============================================================================
+# # ------------------------------- Test du classifieur ---------------------------------
+# test_pos = test[ test['sentiment'] == 'positive']
+# test_pos = test_pos['text']
+# test_neg = test[ test['sentiment'] == 'negative']
+# test_neg = test_neg['text']
+# 
+# neg_cnt = 0
+# pos_cnt = 0
+# total_neg = 0
+# total_pos = 0
+# 
+# # Test sur tweets annotés négativement
+# print('------------------ Tweets négatifs ------------------\n')
+# for tweet in test_neg:
+#     classification = classify_tweet(tweet)
+#     if classification: # si le tweet a au moins un emoji
+#         print(tweet)
+#         total_neg += 1
+#         if classification == 'negative': 
+#             neg_cnt += 1
+# 
+# # Test sur les tweets annotés positivement
+# for tweet in test_pos:
+#     classification = classify_tweet(tweet)
+#     if classification:
+#         total_pos += 1
+#         if classification == 'positive': 
+#             pos_cnt += 1
+# 
+# print()
+# print('[negative]: %s/%s '  % (neg_cnt, total_neg))
+# print('[positive]: %s/%s '  % (pos_cnt, total_pos))
+# # ---------------------------- Fin de test du classifieur ------------------------------
+# =============================================================================
