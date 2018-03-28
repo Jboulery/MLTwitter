@@ -33,6 +33,9 @@ from nltk.stem.snowball import SnowballStemmer
 from sklearn.naive_bayes import MultinomialNB
 from textblob import TextBlob
 from textblob_fr import PatternTagger, PatternAnalyzer
+import pandas as pd 
+
+
 
 
 ############## Classifieur des tweets basé sur les emojis ###############
@@ -576,4 +579,98 @@ def predict_tweets(L):
 
 ############## popularité ######################
 
+#load and extract data
+def extract():
+    data = pd.read_csv('./twitter.Prime24Mars.csv')
+    data['text'] = data['extended_tweet.full_text'].fillna(data['text'])
+    data.drop(['extended_tweet.full_text'], axis=1, inplace=True)
+    data = data[data['text'].isnull() == False]
+    data.reset_index(inplace=True)
+    data = data.drop(['index'],axis=1)
 
+    print ('dataset loaded with shape', data.shape)    
+    return data
+
+data = extract()
+
+# sentiment analysis and add 'sentiment' column
+
+sentiment = []
+for tweet in data['text']:
+        y_pred = predict_tweets('%s' % (tweet))
+
+        if (y_pred == 0):
+               sentiment.append('positive')
+        elif(y_pred == 1):
+               sentiment.append('negative')
+
+data['sentiment'] = sentiment
+
+candidats = [["Ecco","ecco","eco","piano"],
+             ["Xam","xam","hurricane","huricane"],
+             ["Liv","liv","del","estal"],
+             ["Gabriel","gabriel","grabiell","voiture"],
+             ["rebecca","rébécca","rebeca","Rebecca"],
+             ["Gulaan","gulan","gulaan","gulann","gullan","gullaan","polynésien","polynesie","polynésienne","Gulan"],
+             ["drea","dréa","dury","duri","dreaduri","dreadury","colombienne","colombie","Drea"],
+             ["kriil","kril","krill","kriill","kezako"],
+             ["yvette","dantier","ivette","yvett","yvete","maurice"],
+             ["meryem","meriem","Meriem","mariam","miriam"],
+             ["Assia","assya","acia","assia"],
+             ["Capucine","capucine","capussine","nantes"],
+             ["leho","leo"],
+             ["Norig","norig"]]
+
+#loop over candidates 
+
+cand_score = {}
+len_tweet = {}
+
+for cand in candidats:
+        for i in range(len(cand)):
+                tweet = data[data['text'].str.contains(cand[i])]
+                pos_tweets = tweet.loc[tweet['sentiment'] == 'positive']
+                neg_tweets = tweet.loc[tweet['sentiment'] == 'negative']
+                
+                
+                pos_score = 0
+                neg_score = 0
+                
+                for j in range(len(pos_tweets)):
+                    pos_score += 1
+
+                for j in range(len(neg_tweets)):
+                    neg_score += -1
+                
+                tweet_len = len(tweet)
+                len_tweet [cand[i]] = tweet_len
+
+                value = pos_score + neg_score
+                cand_score[cand[i]] = value
+
+
+
+new_dict = {}
+
+for i in range(len(candidats)):
+    new_score = 0
+    length = 0
+    for key,value in cand_score.items():
+            if (key in candidats[i]):
+                new_score += value
+    for key1,value1 in len_tweet.items():
+            if (key1 in candidats[i]):
+                length += value1
+    
+    new_dict[candidats[i][0]] = round(new_score/length if length != 0 else 0,3)
+
+print(new_dict)
+            
+
+            
+################ END SCORING ########################
+
+"""test results SVM [PRIME 24 Mars]
+{'Assia': -1.0, 'Norig': -0.273, 'meryem': -0.333, 'Ecco': 0.36, 'Xam': -0.098, 'rebecca': -1.0, 'Capucine': 0.047, 'Liv': -0.18, 'yvette': 0.286, 
+'kriil': -0.333, 'Gulaan': 0.239, 'Gabriel': 0.191, 'leho': 0.25, 'drea': 0.15}
+"""
